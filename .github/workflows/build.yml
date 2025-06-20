@@ -1,0 +1,72 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Cache Gradle packages
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: Make gradlew executable
+      run: chmod +x gradlew
+      
+    - name: Build debug APK
+      run: ./gradlew assembleDebug
+      
+    - name: Upload APK
+      uses: actions/upload-artifact@v3
+      with:
+        name: local-viewer-debug.apk
+        path: app/build/outputs/apk/debug/app-debug.apk
+        
+    - name: Create Release
+      if: github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v1.0.${{ github.run_number }}
+        name: Local Viewer v1.0.${{ github.run_number }}
+        body: |
+          🚀 **App Android Nativo - Local Viewer**
+          
+          **Funcionalidade**: Detecta IP local do WiFi automaticamente e acessa porta 3000
+          
+          **Como usar**:
+          1. Baixe o APK
+          2. Instale no dispositivo Android: `adb install local-viewer-debug.apk`
+          3. Certifique-se que o dispositivo está na mesma rede WiFi que o servidor
+          4. Execute o app - ele conectará automaticamente em `http://[IP_LOCAL]:3000`
+          
+          **Funcionalidades**:
+          - ✅ Detecção automática de IP local via WiFi
+          - ✅ WebView nativo com JavaScript habilitado
+          - ✅ Navegação back/forward dentro do app
+          - ✅ Fallback para IP padrão se detecção falhar
+          - ✅ Cleartext traffic habilitado para conexões HTTP locais
+        files: |
+          app/build/outputs/apk/debug/app-debug.apk
+        draft: false
+        prerelease: false
+        token: ${{ secrets.GITHUB_TOKEN }}
